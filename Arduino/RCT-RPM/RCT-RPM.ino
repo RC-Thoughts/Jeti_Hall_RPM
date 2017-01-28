@@ -23,7 +23,7 @@ String sensVersion = "v.1.0";
 
 // Settings according models hardware
 int magnets = 1; // How many magnets on your setup?
-int gearRatio = 1; // Gear ratio, for example 172 main gear and 17 teeth pinion = 172/17 = 10.11765
+float gearRatio = 1; // Gear ratio, for example 172 main gear and 17 teeth pinion = 172/17 = 10.11765
 
 // Do not touch below this
 #include <SoftwareSerialJeti.h>
