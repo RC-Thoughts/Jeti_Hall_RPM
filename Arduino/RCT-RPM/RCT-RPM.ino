@@ -10,7 +10,7 @@
 
     Features:
     - Arduino Pro Mini 3.3V 8Mhz
-    - Hall Sensor 
+    - Omnipolar Hall Sensor (SS451A Honeywell used in development)
 
    --------------------------------------------------------
     ALWAYS test functions thoroughly before use!
@@ -23,7 +23,7 @@ String sensVersion = "v.1.0";
 
 // Settings according models hardware
 int magnets = 1; // How many magnets on your setup?
-float gearRatio = 1; // Gear ratio * 10, for example 18 teeth pinion and 172 main gear = 18/172 = 10.4651
+float gearRatio = 1; // Gear ratio, for example 172 main gear and 17 teeth pinion = 172/17 = 10.11765
 
 // Do not touch below this
 #include <SoftwareSerialJeti.h>
@@ -273,10 +273,10 @@ void loop()
     rpm = 0;
   }
   else {
-    rpm = (rps * 60 * gearRatio) / magnets;
+    rpm = ((rps*60)/magnets)/gearRatio;
     if (rpm < 0) {
       rpm = 0;
     }
   }
-  Serial.print("Freq "); Serial.print(rps);Serial.print(" RPM ");Serial.println(rpm);
+  Serial.print(" RPM ");Serial.println(rpm);
 }
