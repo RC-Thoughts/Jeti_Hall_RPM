@@ -1,14 +1,16 @@
 /*
    --------------------------------------------------------
-        Jeti Arduino RPM Sensor v 1.0
+        Jeti Arduino RPM Sensor v 1.1
    --------------------------------------------------------
 
     Tero Salminen RC-Thoughts.com 2017 www.rc-thoughts.com
 
     Ability to set amount magnets (2 is recommended for balance)
-    If for example headspeed is wanted you can set gear-ratio.
+    Ability to set gear ratio and install location (Motor/Main gear)
 
-    Features:
+    Settings done from Jetibox. 
+
+    Hardware:
     - Arduino Pro Mini 3.3V 8Mhz
     - Omnipolar Hall Sensor (SS451A Honeywell used in development)
 
@@ -18,25 +20,31 @@
     Shared under MIT-license by Tero Salminen 2017
    --------------------------------------------------------
 */
- 
-String sensVersion = "v.1.0";
 
-// Settings according models hardware
-int magnets = 1; // How many magnets on your setup?
-float gearRatio = 1; // Gear ratio, for example 172 main gear and 17 teeth pinion = 172/17 = 10.11765
+String sensVersion = "v.1.1";
 
-// Do not touch below this
+// No settings to be defined by user - Use Jetibox
 #include <SoftwareSerialJeti.h>
 #include <JETI_EX_SENSOR.h>
+#include <EEPROM.h>
+
+int magnets = EEPROM.read(0);
+int gearMot = EEPROM.read(1);
+int gearMain = EEPROM.read(2);
+int install = EEPROM.read(3);
+
 unsigned int rpm;
+unsigned int rpmA;
 int hall = 2;
 int rps;
 long interval;
+int settings = 0;
+long settingsTime = 0;
+long stopTime = 0;
 int header = 0;
 int lastbtn = 240;
-int current_screen = 1;
+int current_screen = 0;
 int current_config = 0;
-
 char temp[LCDMaxPos / 2];
 char msg_line1[LCDMaxPos / 2];
 char msg_line2[LCDMaxPos / 2];
@@ -52,11 +60,13 @@ char msg_line2[LCDMaxPos / 2];
 #define JETI_TX 4
 #endif
 
-#define JETI_SENSOR_ID1 0x11 // 0x11 for first, 0x12 for second, 0x13 for third
-
-#define ITEMNAME_1 F("RPM")
+#define ITEMNAME_1 F("RPM Motor")
 #define ITEMTYPE_1 F("rpm")
-#define ITEMVAL_1 (unsigned int*)&rpm 
+#define ITEMVAL_1 (unsigned int*)&rpm
+
+#define ITEMNAME_2 F("RPM Main")
+#define ITEMTYPE_2 F("rpm")
+#define ITEMVAL_2 (unsigned int*)&rpmA
 
 #define ABOUT_1 F(" RCT Jeti Tools")
 #define ABOUT_2 F("   RPM-Sensor")
@@ -172,7 +182,14 @@ unsigned char SendFrame()
   }
 }
 
-#define MAX_SCREEN 1
+unsigned char DisplayFrame()
+{
+  for (int i = 0 ; i < JB.frameSize ; i++ )
+  {
+  }
+}
+
+#define MAX_SCREEN 8
 #define MAX_CONFIG 1
 #define COND_LES_EQUAL 1
 #define COND_MORE_EQUAL 2
@@ -196,7 +213,9 @@ void setup()
   JB.JetiBox(ABOUT_1, ABOUT_2);
   JB.Init(F("RCT"));
   JB.addData(ITEMNAME_1, ITEMTYPE_1);
+  JB.addData(ITEMNAME_2, ITEMTYPE_2);
   JB.setValueBig(1, ITEMVAL_1);
+  JB.setValueBig(2, ITEMVAL_2);
   do {
     JB.createFrame(1);
     SendFrame();
@@ -204,11 +223,139 @@ void setup()
   }
   while (sensorFrameName != 0);
   digitalWrite(13, LOW);
+  if ((magnets == 0) or (magnets == 255)) {
+    magnets = 1;
+  }
+  if ((gearMot == 0) or (gearMot == 255)) {
+    gearMot = 1;
+  }
+  if ((gearMain == 0) or (gearMain == 255)) {
+    gearMain = 1;
+  }
+  if (install == 255) {
+    install = 0;
+  }
+  Serial.print("Magnets: "); Serial.println(magnets);
+  Serial.print("Gear ratio: "); Serial.print(gearMot); Serial.print(":"); Serial.println(gearMain);
+  if (install == 0) {
+    Serial.println("Sensor on motor.");
+  }
+  if (install == 1) {
+    Serial.println("Sensor on main.");
+  }
+}
+
+void process_screens()
+{
+  switch (current_screen)
+  {
+    case 0 : {
+        JB.JetiBox(ABOUT_1, ABOUT_2);
+        break;
+      }
+    case 1 : {
+         msg_line1[0] = 0; msg_line2[0] = 0;
+         
+        temp[0] = 0;
+        floatToString((char*)&temp, magnets, 0);
+        strcat((char*)&msg_line1, (char*)&temp);
+        strcat_P((char*)&msg_line1, (prog_char*)F(" Magn. on "));
+        if (install == 0) {
+          strcat_P((char*)&msg_line1, (prog_char*)F("Motor"));
+        }
+        if (install == 1) {
+          strcat_P((char*)&msg_line1, (prog_char*)F("Main"));
+        }
+
+        strcat_P((char*)&msg_line2, (prog_char*)F("Ratio: "));
+        temp[0] = 0;
+        floatToString((char*)&temp, gearMot, 0);
+        strcat((char*)&msg_line2, (char*)&temp);
+        strcat_P((char*)&msg_line2, (prog_char*)F(":"));
+
+        temp[0] = 0;
+        floatToString((char*)&temp, gearMain, 0);
+        strcat((char*)&msg_line2, (char*)&temp);
+
+        JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
+        break;
+      }
+    case 2: {
+        msg_line1[0] = 0; msg_line2[0] = 0;
+        if (install == 0) {
+          strcat_P((char*)&msg_line1, (prog_char*)F("Sensor on Motor"));
+        }
+        if (install == 1) {
+          strcat_P((char*)&msg_line1, (prog_char*)F("Sensor on Main"));
+        }
+
+        strcat_P((char*)&msg_line2, (prog_char*)F("Set Up/Dn Next>"));
+        JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
+        break;
+      }
+    case 3 : {
+        msg_line1[0] = 0; msg_line2[0] = 0;
+        temp[0] = 0;
+        floatToString((char*)&temp, magnets, 0);
+        strcat((char*)&msg_line1, (char*)&temp);
+        strcat_P((char*)&msg_line1, (prog_char*)F(" Magn. on "));
+        if (install == 0) {
+          strcat_P((char*)&msg_line1, (prog_char*)F("Motor"));
+        }
+        if (install == 1) {
+          strcat_P((char*)&msg_line1, (prog_char*)F("Main"));
+        }
+
+        strcat_P((char*)&msg_line2, (prog_char*)F("Set Up/Dn Next>"));
+        JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
+        break;
+      }
+    case 4 : {
+        msg_line1[0] = 0; msg_line2[0] = 0;
+        strcat_P((char*)&msg_line1, (prog_char*)F("Gear Motor: "));
+        temp[0] = 0;
+        floatToString((char*)&temp, gearMot, 0);
+        strcat((char*)&msg_line1, (char*)&temp);
+
+        strcat_P((char*)&msg_line2, (prog_char*)F("Set Up/Dn Next>"));
+        JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
+        break;
+      }
+    case 5 : {
+        msg_line1[0] = 0; msg_line2[0] = 0;
+        strcat_P((char*)&msg_line1, (prog_char*)F("Gear Main: "));
+        temp[0] = 0;
+        floatToString((char*)&temp, gearMain, 0);
+        strcat((char*)&msg_line1, (char*)&temp);
+
+        strcat_P((char*)&msg_line2, (prog_char*)F("Set Up/Dn Next>"));
+        JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
+        break;
+      }
+    case 6 : {
+        msg_line1[0] = 0; msg_line2[0] = 0;
+        strcat_P((char*)&msg_line1, (prog_char*)F("Save: Up and Dn"));
+        strcat_P((char*)&msg_line2, (prog_char*)F("Back: <"));
+        JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
+        break;
+      }
+    case MAX_SCREEN : {
+        JB.JetiBox(ABOUT_1, ABOUT_2);
+        break;
+      }
+    case 99 : {
+        msg_line1[0] = 0; msg_line2[0] = 0;
+        strcat_P((char*)&msg_line1, (prog_char*)F("Values stored!"));
+        strcat_P((char*)&msg_line2, (prog_char*)F("Press < to exit"));
+        JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
+        break;
+      }
+  }
 }
 
 // Working loop
 void loop()
-{ 
+{
   // Jeti Stuff
   unsigned long time = millis();
   SendFrame();
@@ -228,18 +375,116 @@ void loop()
 
   if (JetiSerial.available() > 0 )
   { read = JetiSerial.read();
+
     if (lastbtn != read)
     {
       lastbtn = read;
       switch (read)
       {
-        case 224 :
+        case 224 : // RIGHT
+          if (settings == 0) {
+            settingsTime = millis();
+            settings = 1;
+          }
+          if (current_screen != MAX_SCREEN)
+          {
+            current_screen++;
+            if (current_screen == 7) current_screen = 0;
+          }
           break;
-        case 112 :
+        case 112 : // LEFT
+          if (current_screen != MAX_SCREEN)
+            if (current_screen == 99) current_screen = 1;
+            else
+            {
+              current_screen--;
+              if (current_screen > MAX_SCREEN) current_screen = 0;
+            }
           break;
-        case 208 :
+        case 208 : // UP
+          if (current_screen == 2) {
+            if (install == 0) {
+              install = 1;
+            }
+            current_screen = 2;
+          }
+          if (current_screen == 3) {
+            magnets = magnets + 1;
+            current_screen = 3;
+          }
+          if (current_screen == 4) {
+            gearMot = gearMot + 1;
+            current_screen = 4;
+          }
+          if (current_screen == 5) {
+            gearMain = gearMain + 1;
+            current_screen = 5;
+          }
           break;
-        case 176 :
+        case 176 : // DOWN
+          if (current_screen == 2) {
+            if (install == 1) {
+              install = 0;
+            }
+            current_screen = 2;
+          }
+          if (current_screen == 3) {
+            magnets = magnets - 1;
+            current_screen = 3;
+          }
+          if (current_screen == 4) {
+            gearMot = gearMot + 10;
+            current_screen = 4;
+          }
+          if (current_screen == 5) {
+            gearMain = gearMain + 10;
+            current_screen = 5;
+          }
+          break;
+        case 144 : // UP+DOWN
+          if (current_screen == 4) {
+            gearMot = gearMot + 50;
+            current_screen = 4;
+          }
+          if (current_screen == 5) {
+            gearMain = gearMain + 50;
+            current_screen = 5;
+          }
+          if (current_screen == 6) {
+            // Store values to eeprom
+            if (magnets > 255) {
+              magnets = 254;
+            }
+            if (gearMot > 255) {
+              gearMot = 254;
+            }
+            if (gearMain > 255) {
+              gearMain = 254;
+            }
+            EEPROM.write(0, magnets);
+            EEPROM.write(1, gearMot);
+            EEPROM.write(2, gearMain);
+            EEPROM.write(3, install);
+            current_screen = 99;
+          }
+          break;
+        case 96 : // LEFT+RIGHT
+          if (current_screen == 2) {
+            install = 0;
+            current_screen = 2;
+          }
+          if (current_screen == 3) {
+            magnets = 1;
+            current_screen = 3;
+          }
+          if (current_screen == 4) {
+            gearMot = 1;
+            current_screen = 4;
+          }
+          if (current_screen == 5) {
+            gearMain = 1;
+            current_screen = 5;
+          }
           break;
       }
     }
@@ -247,6 +492,7 @@ void loop()
 
   if (current_screen != MAX_SCREEN)
     current_config = 0;
+  process_screens();
   header++;
   if (header >= 5)
   {
@@ -259,24 +505,36 @@ void loop()
   }
 
   long wait = GETCHAR_TIMEOUT_ms;
-  long milli = millis() - time; 
+  long milli = millis() - time;
   if (milli > wait)
     wait = 0;
   else
     wait = wait - milli;
   pinMode(JETI_TX, OUTPUT);
-  
+
   // RPM-Stuff
-  interval = pulseIn(hall, HIGH) + pulseIn(hall, LOW);
-  rps = 1000000UL / interval;
-  if (rps == -1) {
-    rpm = 0;
-  }
-  else {
-    rpm = ((rps*60)/magnets)/gearRatio;
-    if (rpm < 0) {
+  if (settings == 0) {
+    interval = pulseIn(hall, HIGH) + pulseIn(hall, LOW);
+    rps = 1000000UL / interval;
+    if (rps == -1) {
       rpm = 0;
+      rpmA = 0;
+    }
+    else {
+      if (install == 0) {
+        rpm = ((rps * 60) / magnets);
+        rpmA = (rpm / (gearMain / gearMot));
+      }
+      if (install == 1) {
+        rpmA = ((rps * 60) / magnets);
+        rpm = (rpmA * (gearMain / gearMot));
+      }
     }
   }
-  Serial.print("RPM: ");Serial.println(rpm);
+  if (settingsTime != 0) {
+    stopTime = millis() + 300000;
+    if (settingsTime > stopTime) {
+      settings = 0;
+    }
+  }
 }
