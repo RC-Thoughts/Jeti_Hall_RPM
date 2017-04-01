@@ -1,6 +1,6 @@
 /*
    --------------------------------------------------------
-        Jeti Arduino RPM Sensor v 1.1
+        Jeti Arduino RPM Sensor v 1.2
    --------------------------------------------------------
 
     Tero Salminen RC-Thoughts.com 2017 www.rc-thoughts.com
@@ -8,7 +8,7 @@
     Ability to set amount magnets (2 is recommended for balance)
     Ability to set gear ratio and install location (Motor/Main gear)
 
-    Settings done from Jetibox. 
+    All settings done from Jetibox, RPM Monitor available on Jetibox.   
 
     Hardware:
     - Arduino Pro Mini 3.3V 8Mhz
@@ -21,7 +21,7 @@
    --------------------------------------------------------
 */
 
-String sensVersion = "v.1.1";
+String sensVersion = "v.1.2";
 
 // No settings to be defined by user - Use Jetibox
 #include <SoftwareSerialJeti.h>
@@ -189,7 +189,7 @@ unsigned char DisplayFrame()
   }
 }
 
-#define MAX_SCREEN 8
+#define MAX_SCREEN 9
 #define MAX_CONFIG 1
 #define COND_LES_EQUAL 1
 #define COND_MORE_EQUAL 2
@@ -253,7 +253,20 @@ void process_screens()
         JB.JetiBox(ABOUT_1, ABOUT_2);
         break;
       }
-    case 1 : {
+    case 1: {
+        msg_line1[0] = 0; msg_line2[0] = 0;
+        strcat_P((char*)&msg_line1, (prog_char*)F("RPM Mot.:"));
+        temp[0] = 0;
+        floatToString((char*)&temp, rpm, 0);
+        strcat((char*)&msg_line1, (char*)&temp);        
+        strcat_P((char*)&msg_line2, (prog_char*)F("RPM Main:"));
+        temp[0] = 0;
+        floatToString((char*)&temp, rpmA, 0);
+        strcat((char*)&msg_line2, (char*)&temp);
+        JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
+        break;
+      }
+    case 2 : {
          msg_line1[0] = 0; msg_line2[0] = 0;
          
         temp[0] = 0;
@@ -280,7 +293,7 @@ void process_screens()
         JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
         break;
       }
-    case 2: {
+    case 3: {
         msg_line1[0] = 0; msg_line2[0] = 0;
         if (install == 0) {
           strcat_P((char*)&msg_line1, (prog_char*)F("Sensor on Motor"));
@@ -293,7 +306,7 @@ void process_screens()
         JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
         break;
       }
-    case 3 : {
+    case 4 : {
         msg_line1[0] = 0; msg_line2[0] = 0;
         temp[0] = 0;
         floatToString((char*)&temp, magnets, 0);
@@ -310,7 +323,7 @@ void process_screens()
         JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
         break;
       }
-    case 4 : {
+    case 5 : {
         msg_line1[0] = 0; msg_line2[0] = 0;
         strcat_P((char*)&msg_line1, (prog_char*)F("Gear Motor: "));
         temp[0] = 0;
@@ -321,7 +334,7 @@ void process_screens()
         JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
         break;
       }
-    case 5 : {
+    case 6 : {
         msg_line1[0] = 0; msg_line2[0] = 0;
         strcat_P((char*)&msg_line1, (prog_char*)F("Gear Main: "));
         temp[0] = 0;
@@ -332,7 +345,7 @@ void process_screens()
         JB.JetiBox((char*)&msg_line1, (char*)&msg_line2);
         break;
       }
-    case 6 : {
+    case 7 : {
         msg_line1[0] = 0; msg_line2[0] = 0;
         strcat_P((char*)&msg_line1, (prog_char*)F("Save: Up and Dn"));
         strcat_P((char*)&msg_line2, (prog_char*)F("Back: <"));
@@ -389,68 +402,74 @@ void loop()
           if (current_screen != MAX_SCREEN)
           {
             current_screen++;
-            if (current_screen == 7) current_screen = 0;
+            if (current_screen == 8) current_screen = 0;
+          }
+          if (current_screen == 1) {
+            settings = 0;
           }
           break;
         case 112 : // LEFT
           if (current_screen != MAX_SCREEN)
-            if (current_screen == 99) current_screen = 1;
+            if (current_screen == 99) current_screen = 2;
             else
             {
               current_screen--;
               if (current_screen > MAX_SCREEN) current_screen = 0;
             }
+            if (current_screen == 1) {
+                settings = 0;
+            }
           break;
         case 208 : // UP
-          if (current_screen == 2) {
+          if (current_screen == 3) {
             if (install == 0) {
               install = 1;
             }
-            current_screen = 2;
+            current_screen = 3;
           }
-          if (current_screen == 3) {
+          if (current_screen == 4) {
             magnets = magnets + 1;
-            current_screen = 3;
+            current_screen = 4;
           }
-          if (current_screen == 4) {
+          if (current_screen == 5) {
             gearMot = gearMot + 1;
-            current_screen = 4;
-          }
-          if (current_screen == 5) {
-            gearMain = gearMain + 1;
-            current_screen = 5;
-          }
-          break;
-        case 176 : // DOWN
-          if (current_screen == 2) {
-            if (install == 1) {
-              install = 0;
-            }
-            current_screen = 2;
-          }
-          if (current_screen == 3) {
-            magnets = magnets - 1;
-            current_screen = 3;
-          }
-          if (current_screen == 4) {
-            gearMot = gearMot + 10;
-            current_screen = 4;
-          }
-          if (current_screen == 5) {
-            gearMain = gearMain + 10;
-            current_screen = 5;
-          }
-          break;
-        case 144 : // UP+DOWN
-          if (current_screen == 4) {
-            gearMot = gearMot + 50;
-            current_screen = 4;
-          }
-          if (current_screen == 5) {
-            gearMain = gearMain + 50;
             current_screen = 5;
           }
           if (current_screen == 6) {
+            gearMain = gearMain + 1;
+            current_screen = 6;
+          }
+          break;
+        case 176 : // DOWN
+          if (current_screen == 3) {
+            if (install == 1) {
+              install = 0;
+            }
+            current_screen = 3;
+          }
+          if (current_screen == 4) {
+            magnets = magnets - 1;
+            current_screen = 4;
+          }
+          if (current_screen == 5) {
+            gearMot = gearMot + 10;
+            current_screen = 5;
+          }
+          if (current_screen == 6) {
+            gearMain = gearMain + 10;
+            current_screen = 6;
+          }
+          break;
+        case 144 : // UP+DOWN
+          if (current_screen == 5) {
+            gearMot = gearMot + 50;
+            current_screen = 5;
+          }
+          if (current_screen == 6) {
+            gearMain = gearMain + 50;
+            current_screen = 6;
+          }
+          if (current_screen == 7) {
             // Store values to eeprom
             if (magnets > 255) {
               magnets = 254;
@@ -469,21 +488,21 @@ void loop()
           }
           break;
         case 96 : // LEFT+RIGHT
-          if (current_screen == 2) {
-            install = 0;
-            current_screen = 2;
-          }
           if (current_screen == 3) {
-            magnets = 1;
+            install = 0;
             current_screen = 3;
           }
           if (current_screen == 4) {
-            gearMot = 1;
+            magnets = 1;
             current_screen = 4;
           }
           if (current_screen == 5) {
-            gearMain = 1;
+            gearMot = 1;
             current_screen = 5;
+          }
+          if (current_screen == 6) {
+            gearMain = 1;
+            current_screen = 6;
           }
           break;
       }
@@ -520,7 +539,7 @@ void loop()
       rpm = 0;
       rpmA = 0;
     }
-    else {
+   else {
       if (install == 0) {
         rpm = ((rps * 60) / magnets);
         rpmA = (rpm / (gearMain / gearMot));
