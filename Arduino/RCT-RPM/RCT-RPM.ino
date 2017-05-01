@@ -556,4 +556,6 @@ void loop()
       settings = 0;
     }
   }
+  // Debug - remove // below to enable 
+  //Serial.print("Motor: "); Serial.print(rpm); Serial.print(" Main: "); Serial.println(rpmA);
 }
